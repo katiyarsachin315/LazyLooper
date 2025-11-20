@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lazy Looper (Dynamic Loops)</title>
+<style>
+    body {
+        font-family: "Segoe UI", sans-serif;
+        background: #f8f9fa;
+        margin: 0;
+        padding: 16px;
+        display: flex;
+        justify-content: center;
+    }
+    .container {
+        width: 640px;
+        background: white;
+        border-radius: 6px;
+        padding: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    h1 {
+        margin: 0 0 12px 0;
+        font-size: 18px;
+        font-weight: 600;
+        text-align: center;
+    }
+    .split-group { display: flex; gap: 8px; }
+    .form-group { margin-bottom: 10px; }
+    label { font-size: 13px; font-weight: 500; display: block; margin-bottom: 4px; }
+    input, textarea {
+        width: 100%;
+        padding: 6px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 13px;
+    }
+    textarea { min-height: 70px; resize: vertical; font-family: monospace; }
+    .btn {
+        border: none;
+        padding: 6px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 13px;
+        transition: 0.2s;
+    }
+    .btn-run { background: #198754; color: #fff; width: 100%; margin-top: 8px; }
+    .btn-run:hover { background: #157347; }
+    .btn-test { background: #e9ecef; }
+    .btn-clear { background: #ffc107; }
+    .btn-add { background: #0d6efd; color: white; width: 100%; margin-bottom: 10px; }
+    .button-group { display: flex; gap: 6px; margin-bottom: 8px; }
+
+    /* Toggle */
+    .toggle-container { display: flex; align-items: center; gap: 6px; }
+    .switch { position: relative; width: 34px; height: 18px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+        position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+        background: #ccc; border-radius: 20px; transition: 0.3s;
+    }
+    .slider:before {
+        position: absolute; content: ""; height: 14px; width: 14px;
+        left: 2px; bottom: 2px; background: white; border-radius: 50%; transition: 0.3s;
+    }
+    input:checked + .slider { background: #0d6efd; }
+    input:checked + .slider:before { transform: translateX(16px); }
+    .extra-loop-content { display: none; margin-top: 6px; }
+    .loop-box { border: 1px solid #e0e0e0; padding: 8px; border-radius: 4px; margin-bottom: 6px; }
+
+    /* Modal */
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 10;
+        left: 0; top: 0;
+        width: 100%; height: 100%;
+        background: rgba(0,0,0,0.4);
+        justify-content: center;
+        align-items: center;
+    }
+    .modal-content {
+        background: white;
+        padding: 14px;
+        border-radius: 6px;
+        width: 520px;
+        box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+    }
+    h3 { margin: 0 0 8px 0; font-size: 15px; }
+    #output-box {
+        width: 100%;
+        height: 240px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        padding: 8px;
+        resize: none;
+        font-family: monospace;
+        font-size: 13px;
+    }
+    .modal-buttons {
+        margin-top: 8px;
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+    }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>Lazy Looper</h1>
+    <div class="button-group">
+        <button id="fill-data-btn" class="btn btn-test">Fill Test Data</button>
+        <button id="clear-btn" class="btn btn-clear">Clear</button>
+    </div>
+
+    <form id="looper-form">
+        <div class="split-group">
+            <div class="form-group">
+                <label>Start</label>
+                <input type="number" id="start-num" placeholder="Start">
+            </div>
+            <div class="form-group">
+                <label>End</label>
+                <input type="number" id="end-num" placeholder="End">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Main Variable</label>
+            <input type="text" id="main-var" placeholder="{{id}}">
+        </div>
+        <div class="form-group">
+            <label>Main Input</label>
+            <textarea id="main-input" placeholder="Paste your main template"></textarea>
+        </div>
+
+        <div id="extra-loops"></div>
+
+        <button type="button" id="add-loop-btn" class="btn btn-add">+ Add Extra Loop</button>
+
+        <button type="submit" class="btn btn-run">Run</button>
+    </form>
+</div>
+
+<!-- Output Modal -->
+<div id="output-modal" class="modal">
+    <div class="modal-content">
+        <h3>Generated Output</h3>
+        <textarea id="output-box" readonly></textarea>
+        <div class="modal-buttons">
+            <button id="copy-btn" class="btn btn-test">Copy</button>
+            <button id="close-btn" class="btn btn-clear">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const form = document.getElementById("looper-form");
+    const startNum = document.getElementById("start-num");
+    const endNum = document.getElementById("end-num");
+    const mainVar = document.getElementById("main-var");
+    const mainInput = document.getElementById("main-input");
+    const extraLoopsContainer = document.getElementById("extra-loops");
+    const addLoopBtn = document.getElementById("add-loop-btn");
+    const outputModal = document.getElementById("output-modal");
+    const outputBox = document.getElementById("output-box");
+    const copyBtn = document.getElementById("copy-btn");
+    const closeBtn = document.getElementById("close-btn");
+    const fillBtn = document.getElementById("fill-data-btn");
+    const clearBtn = document.getElementById("clear-btn");
+
+    let loopCount = 0;
+
+    function createExtraLoop() {
+        loopCount++;
+        const loopId = `loop-${loopCount}`;
+        const div = document.createElement("div");
+        div.className = "loop-box";
+        div.innerHTML = `
+            <div class="toggle-container">
+                <label class="switch">
+                    <input type="checkbox" id="toggle-${loopId}">
+                    <span class="slider"></span>
+                </label>
+                <span>Extra Loop</span>
+                <button type="button" class="btn btn-clear btn-sm remove-loop" style="margin-left:auto;">×</button>
+            </div>
+            <div class="extra-loop-content" id="content-${loopId}">
+                <input type="text" id="var-${loopId}" placeholder="{{variable}}">
+                <textarea id="input-${loopId}" placeholder="Line 1\nLine 2"></textarea>
+            </div>
+        `;
+        extraLoopsContainer.appendChild(div);
+
+        const toggle = div.querySelector(`#toggle-${loopId}`);
+        const content = div.querySelector(`#content-${loopId}`);
+        const removeBtn = div.querySelector(".remove-loop");
+
+        toggle.addEventListener("change", () => {
+            content.style.display = toggle.checked ? "block" : "none";
+        });
+        removeBtn.addEventListener("click", () => div.remove());
+    }
+
+    addLoopBtn.addEventListener("click", createExtraLoop);
+
+    function generateOutput() {
+        const start = parseInt(startNum.value) || 0;
+        const end = parseInt(endNum.value) || 0;
+        const template = mainInput.value;
+        const mainLoopVar = mainVar.value;
+        let result = "";
+
+        for (let i = start; i <= end; i++) {
+            let current = template;
+            if (mainLoopVar) current = current.split(mainLoopVar).join(i);
+
+            const allLoops = extraLoopsContainer.querySelectorAll(".loop-box");
+            allLoops.forEach((loop) => {
+                const toggle = loop.querySelector("input[type=checkbox]");
+                const varField = loop.querySelector("input[type=text]");
+                const textarea = loop.querySelector("textarea");
+                if (toggle.checked && varField.value) {
+                    const lines = textarea.value.split("\n");
+                    current = current.split(varField.value).join(lines[i - start] || "");
+                }
+            });
+
+            result += current + "\n";
+        }
+
+        outputBox.value = result.trim();
+        outputModal.style.display = "flex";
+    }
+
+    form.addEventListener("submit", e => {
+        e.preventDefault();
+        generateOutput();
+    });
+
+    copyBtn.addEventListener("click", () => {
+        navigator.clipboard.writeText(outputBox.value);
+        copyBtn.textContent = "Copied!";
+        setTimeout(() => copyBtn.textContent = "Copy", 1500);
+    });
+
+    closeBtn.addEventListener("click", () => outputModal.style.display = "none");
+
+    clearBtn.addEventListener("click", () => {
+        form.reset();
+        extraLoopsContainer.innerHTML = "";
+        loopCount = 0;
+        outputBox.value = "";
+    });
+
+    fillBtn.addEventListener("click", () => {
+        clearBtn.click();
+        startNum.value = 1;
+        endNum.value = 3;
+        mainVar.value = "{{id}}";
+        mainInput.value = '<option value="{{id}}">{{fruit}} - {{color}}</option>';
+
+        createExtraLoop();
+        const firstLoop = extraLoopsContainer.querySelector(".loop-box");
+        firstLoop.querySelector("input[type=checkbox]").checked = true;
+        firstLoop.querySelector("#var-loop-1")?.setAttribute("placeholder", "{{fruit}}");
+        firstLoop.querySelector("#var-loop-1")?.setAttribute("value", "{{fruit}}");
+        firstLoop.querySelector("textarea").value = "Apple\nBanana\nOrange";
+        firstLoop.querySelector(".extra-loop-content").style.display = "block";
+
+        createExtraLoop();
+        const secondLoop = extraLoopsContainer.querySelectorAll(".loop-box")[1];
+        secondLoop.querySelector("input[type=checkbox]").checked = true;
+        secondLoop.querySelector("textarea").value = "Red\nYellow\nOrange";
+        secondLoop.querySelector(".extra-loop-content").style.display = "block";
+        const varField2 = secondLoop.querySelector("input[type=text]");
+        varField2.value = "{{color}}";
+    });
+});
+</script>
+</body>
+</html>
